@@ -1,6 +1,6 @@
 # workflows
 
-The reusable GitHub Actions workflows for the intisy-ai ecosystem now live in
+The reusable GitHub Actions workflows for the forebay ecosystem now live in
 [`intisy/workflows`](https://github.com/intisy/workflows), the cross-org shared repository. This
 repository holds none of its own.
 

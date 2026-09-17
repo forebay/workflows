@@ -7,7 +7,7 @@ on:
         description: 'owner/name of the repo holding the gate tool'
         required: false
         type: string
-        default: 'intisy-ai/npm-dual-publish'
+        default: 'forebay/npm-dual-publish'
       tool_ref:
         description: 'Ref of the tool repository; empty takes its default branch'
         required: false
