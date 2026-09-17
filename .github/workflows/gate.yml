@@ -111,11 +111,22 @@ jobs:
                 gh repo clone "$owner/$repo" "tree/$dir/$repo" -- --recurse-submodules \
                   || echo "::warning::skipped $owner/$repo"
               done
-          find tree -maxdepth 2 -mindepth 2 -type d | sort
+          # Each expected path is checked on its own rather than directories being counted at a
+          # depth: `dir` is multi-segment, so no single depth locates every checkout, and a count
+          # that happened to match would still not say a repo was where the gates look for it.
+          actual=0
+          missing=""
+          while read -r path; do
+            if [ -d "tree/$path/.git" ]; then
+              actual=$((actual + 1))
+              echo "tree/$path"
+            else
+              missing="$missing $path"
+            fi
+          done <<< "$(node -e 'for (const e of require("./layout.json")) console.log(e.dir + "/" + e.repo)')"
           expected=$(node -e 'console.log(require("./layout.json").length)')
-          actual=$(find tree -maxdepth 2 -mindepth 2 -type d | wc -l)
           if [ "$actual" -ne "$expected" ]; then
-            echo "::error::Cloned $actual of $expected repositories, so the gates would run on an incomplete tree and could pass by omission."
+            echo "::error::Cloned $actual of $expected repositories, so the gates would run on an incomplete tree and could pass by omission. Missing:$missing"
             exit 1
           fi
 
