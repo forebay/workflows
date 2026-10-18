@@ -1,0 +1,7 @@
+kind: generic
+title: workflows
+description: This org's own shared workflows repository, holding the reusable ecosystem-invariants gate and the schedule that runs it.
+sections:
+  - title
+  - description
+  - content
