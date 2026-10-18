@@ -1,61 +1,57 @@
 # workflows
 
-The reusable GitHub Actions workflows for the forebay ecosystem now live in
-[`intisy/workflows`](https://github.com/intisy/workflows), the cross-org shared repository. This
-repository holds none of its own.
+This org's own shared workflows repository, holding the reusable ecosystem-invariants gate and the schedule that runs it.
 
-## Branching and release standard
+## What is here
 
-Every consuming repo follows a two-stage, tag-gated promotion flow:
+Two workflows, and this repository really does hold them.
 
-| You push | What happens |
-| --- | --- |
-| any branch (`feature/*`, `experimental`) | tests run (repo CI); nothing is merged |
-| a non-`v` tag (e.g. on `feature/*`) | the tagged commit is merged into `experimental` |
-| a `v*` tag (cut from `experimental`) | the tagged commit is merged into `main` and the repo's own build/publish runs |
+| file | kind | what it is |
+| --- | --- | --- |
+| `.github/workflows/gate.yml` | `workflow_call` | **Ecosystem invariants.** The reusable gate: it clones every repo in the ecosystem and runs the invariant checks over all of them at once |
+| `.github/workflows/invariants.yml` | `workflow_dispatch` and `schedule` | the caller that runs the gate, weekly at 04:00 on Mondays, or on demand against a ref you name |
 
-Lifecycle: work on `feature/x`, push a non-`v` tag to land it on `experimental`, push a `vX.Y.Z` tag
-to release to `main`. Plain branch pushes never merge.
+An org may draw on exactly two workflows repositories: its own, which is this one, and
+[`intisy/workflows`](https://github.com/intisy/workflows) for anything shared across orgs. Nearly
+every caller in the tree points at the second, because test, merge, publish and README generation
+are not org-specific. What lives here is the one thing that is: a gate that judges THIS ecosystem's
+repositories against its own invariants.
 
-## Consuming the shared merge workflow
+## Running the gate
 
-Add two thin caller workflows to a repo under `.github/workflows/`:
-
-```yaml
-# promote-experimental.yml
-name: Promote to Experimental
-
-on:
-  push:
-    tags: ['*', '!v*']
-permissions:
-  contents: write
-jobs:
-  promote:
-    uses: intisy/workflows/.github/workflows/merge.yml@main
-    with:
-      source: ${{ github.ref_name }}
-      target: experimental
-```
+It is a sweep across repositories rather than a check of one, so it does not run on push.
 
 ```yaml
-# promote-main.yml
-name: Promote to Main
-
-on:
-  push:
-    tags: ['v*']
-permissions:
-  contents: write
 jobs:
-  promote:
-    uses: intisy/workflows/.github/workflows/merge.yml@main
+  invariants:
+    uses: forebay/workflows/.github/workflows/gate.yml@main
     with:
-      source: experimental
-      target: main
-      sync_back: true
+      clone_ref: development
+    secrets:
+      envPAT: ${{ secrets.PAT }}
 ```
 
-The merge workflow uses the built-in `GITHUB_TOKEN` (org branches are unprotected), so no `PAT` is
-required. Each repo's publish/README workflow should trigger on `tags: ['v*']` (not `['*']`) so
-non-`v` feature tags do not cut a release.
+`envPAT` is not optional in practice. The gate reads other repositories and several of them are
+private, so the job token cannot see them and the workflow fails its own pre-flight with that
+message rather than reporting a misleading pass.
+
+| input | default | what it does |
+| --- | --- | --- |
+| `tool_repository` | `forebay/npm-dual-publish` | the repo holding the gate tool |
+| `tool_ref` | the tool repo's default branch | which ref of the tool to run |
+| `clone_ref` | each repo's default branch | the branch to judge every repo at |
+| `timeout_minutes` | `45` | raise it if the sweep outgrows it |
+
+`clone_ref` is the input worth knowing. Empty, which is what the schedule passes, judges the
+released state. Pointing it at `development` catches a violation before a promotion carries it to
+`main`.
+
+## Branches
+
+Two long-lived branches per repository, `main` and `development`, with `main` the default. Work
+happens on `development` and is merged into `main`; anything else is a short-lived feature branch
+off `development`.
+
+A repository whose content IS the deliverable, which is what this one is, may carry `main` alone
+and take changes directly on it. That is why there is no `development` branch here and why its
+absence is not a deviation.
